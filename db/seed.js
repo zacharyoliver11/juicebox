@@ -7,6 +7,7 @@ const {
   getAllPosts,
   updatePost,
   createInitialPosts,
+  getPostsByTagName,
 } = require("./index");
 
 const createInitialUsers = async () => {
@@ -41,6 +42,8 @@ const dropTables = async () => {
   try {
     console.log("Starting to drop tables...");
     await client.query(`
+    DROP TABLE IF EXISTS post_tags;
+    DROP TABLE IF EXISTS tags;
     DROP TABLE IF EXISTS posts;
     DROP TABLE IF EXISTS users;
         `);
@@ -75,7 +78,22 @@ const createTables = async () => {
     );
     `);
 
-    console.log("Finishes building tables!");
+    await client.query(`
+    CREATE TABLE tags (
+      id SERIAL PRIMARY KEY,
+      name VARCHAR(255) UNIQUE NOT NULL
+    );
+    `);
+
+    await client.query(`
+    CREATE TABLE post_tags (
+      "postId" INTEGER REFERENCES posts(id),
+      "tagId" INTEGER REFERENCES tags(id),
+      UNIQUE("postId", "tagId")
+    )
+    `);
+
+    console.log("Finished building tables!");
   } catch (error) {
     console.error("Error building tables!");
     throw error;
@@ -89,7 +107,9 @@ const rebuildDB = async () => {
     await dropTables();
     await createTables();
     await createInitialUsers();
+    await createInitialPosts();
   } catch (error) {
+    console.log("Error during rebuildDB");
     throw error;
   }
 };
@@ -120,6 +140,17 @@ const testDB = async () => {
       content: "Updated Content",
     });
     console.log("Result:", updatePostResult);
+
+    console.log("Calling updatePost on posts[1], only updating tags");
+    const updatePostTagsResult = await updatePost(posts[1].id, {
+      tags: ["#youcandoanything", "#redfish", "#bluefish"],
+    });
+
+    console.log("Result:", updatePostTagsResult);
+
+    console.log("Calling getPostsByTagName with #happy");
+    const postsWithHappy = await getPostsByTagName("#happy");
+    console.log("Result:", postsWithHappy);
 
     console.log("Calling getUserById with 1");
     const albert = await getUserById(1);
